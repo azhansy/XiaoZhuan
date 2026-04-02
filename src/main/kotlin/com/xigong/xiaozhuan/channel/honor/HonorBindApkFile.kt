@@ -11,5 +11,9 @@ data class HonorBindApkFile(
     data class Item(
         @Json(name = "objectId")
         val objectId: Long,
+        @Json(name = "languageId")
+        val languageId: String? = null,
+        @Json(name = "order")
+        val order: Int? = null,
     )
 }

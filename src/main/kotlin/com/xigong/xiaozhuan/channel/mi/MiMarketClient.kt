@@ -4,6 +4,8 @@ import com.xigong.xiaozhuan.channel.VersionParams
 import com.xigong.xiaozhuan.log.AppLogger
 import com.xigong.xiaozhuan.log.action
 import com.xigong.xiaozhuan.util.ApkInfo
+import com.xigong.xiaozhuan.util.ImageSize
+import com.xigong.xiaozhuan.util.validateScreenshotFiles
 import java.io.File
 import kotlin.math.roundToInt
 
@@ -43,7 +45,21 @@ class MiMarketClient(
         versionParams: VersionParams,
         progress: (Int) -> Unit
     ): Unit = AppLogger.action(LOG_TAG, "上传Apk文件，并提交审核") {
-        marketApi.uploadApk(file, appInfo.packageInfo, versionParams.updateDesc, versionParams.onlineTime) {
+        validateScreenshotFiles(
+            versionParams.screenshots,
+            minCount = 3,
+            maxCount = 5,
+            maxBytes = 5L * 1024 * 1024,
+            requireSize = ImageSize(1080, 1920),
+            allowedExtensions = setOf("jpg", "jpeg", "png")
+        )
+        marketApi.uploadApk(
+            file,
+            appInfo.packageInfo,
+            versionParams.updateDesc,
+            versionParams.onlineTime,
+            versionParams.screenshots
+        ) {
             progress((it * 100).roundToInt())
         }
     }

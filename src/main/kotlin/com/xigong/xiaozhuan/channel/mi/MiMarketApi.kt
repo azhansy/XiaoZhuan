@@ -71,6 +71,7 @@ class MiMarketApi(
         appInfo: MiAppInfoResp.MiAppInfo,
         updateDesc: String,
         onlineTime: Long,
+        screenshotFiles: List<File>,
         progressChange: ProgressChange
     ) = withContext(Dispatchers.IO) {
         val requestData = JSONObject().apply {
@@ -86,6 +87,7 @@ class MiMarketApi(
             })
         }
 
+        val screenshots = screenshotFiles.take(5)
         val sig = JSONObject().apply {
             put("password", privateKey)
             put("sig", JSONArray().apply {
@@ -97,6 +99,12 @@ class MiMarketApi(
                     put("name", "apk")
                     put("hash", FileUtil.getFileMD5(apkFile))
                 })
+                screenshots.forEachIndexed { index, file ->
+                    put(JSONObject().apply {
+                        put("name", "screenshot_${index + 1}")
+                        put("hash", FileUtil.getFileMD5(file))
+                    })
+                }
             })
         }
         val apkBody = ProgressBody(
@@ -108,6 +116,21 @@ class MiMarketApi(
             .addFormDataPart("apk", "", apkBody)
             .addFormDataPart("RequestData", requestData.toString())
             .addFormDataPart("SIG", MiApiSigner.encrypt(sig.toString(), publicKey))
+            .apply {
+                screenshots.forEachIndexed { index, file ->
+                    val imageMediaType = if (file.extension.equals("png", true)) {
+                        "image/png".toMediaType()
+                    } else {
+                        "image/jpeg".toMediaType()
+                    }
+                    val imageBody = ProgressBody(
+                        mediaType = imageMediaType,
+                        file = file,
+                        progressChange = {}
+                    )
+                    addFormDataPart("screenshot_${index + 1}", file.name, imageBody)
+                }
+            }
             .build()
         val request = Request.Builder().url(PUSH).post(body).build()
         val result = httpClient.getJsonResult(request)

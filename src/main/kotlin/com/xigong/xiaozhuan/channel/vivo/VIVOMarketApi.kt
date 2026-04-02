@@ -67,10 +67,48 @@ class VIVOMarketApi(
         VIVOApkResult(result.get("data").asJsonObject)
     }
 
+    suspend fun uploadScreenshot(file: File, packageName: String): String = withContext(Dispatchers.IO) {
+        val params = mapOf(
+            "packageName" to packageName
+        )
+        val signParams = VIVOApiSigner.getSignParams(accessKey, accessSecret, "app.upload.screenshot", params)
+        val requestUrl = DOMAIN.toHttpUrl().newBuilder()
+            .apply {
+                signParams.forEach { addQueryParameter(it.key, it.value) }
+            }
+            .build()
+        val mediaType = if (file.extension.equals("png", true)) {
+            "image/png".toMediaType()
+        } else {
+            "image/jpeg".toMediaType()
+        }
+        val fileBody = ProgressBody(
+            mediaType = mediaType,
+            file = file,
+            progressChange = {}
+        )
+        val requestBody = MultipartBody.Builder()
+            .addFormDataPart("file", file.name, fileBody)
+            .build()
+        val request = Request.Builder()
+            .url(requestUrl)
+            .post(requestBody)
+            .build()
+        val result = okHttpClient.getJsonResult(request)
+        result.checkSuccess("上传截图")
+        val data = result.get("data").asJsonObject
+        data.get("serialnumber").asString
+    }
+
     /**
      * 提交更新
      */
-    suspend fun submit(apkResult: VIVOApkResult, versionParams: VersionParams, appInfo: VIVOAppInfo) =
+    suspend fun submit(
+        apkResult: VIVOApkResult,
+        versionParams: VersionParams,
+        appInfo: VIVOAppInfo,
+        screenshots: List<String>
+    ) =
         withContext(Dispatchers.IO) {
             val onlineTime = versionParams.onlineTime
             // 立即上架:1,定时上架:2
@@ -83,6 +121,9 @@ class VIVOMarketApi(
                 "onlineType" to onlineType,
                 "updateDesc" to versionParams.updateDesc,
             )
+            if (screenshots.isNotEmpty()) {
+                params["screenshot"] = screenshots.joinToString(",")
+            }
             if (onlineTime > 0) {
                 // 上架时间，若onlineType   = 2，上架时间必填。格式：yyyy-MM-dd   HH:mm:ss
                 val format = SimpleDateFormat("yyyy-MM-dd HH:mm:ss")

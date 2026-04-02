@@ -75,6 +75,9 @@ data class ApkConfig(
         /** 上次选择的Apk目录 */
         @Json(name = "apkDir")
         val apkDir: String? = null,
+        /** 宣传图列表（最多5张） */
+        @Json(name = "screenshots")
+        val screenshots: List<String>? = null,
     )
 
     companion object {

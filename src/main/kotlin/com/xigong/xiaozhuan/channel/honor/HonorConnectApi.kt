@@ -119,15 +119,16 @@ suspend fun HonorConnectApi.uploadFile(
     file: File,
     token: String,
     url: HonorUploadUrl,
-    progressChange: ProgressChange
+    progressChange: ProgressChange,
+    contentType: String
 ): Unit = withContext(Dispatchers.IO) {
     val client = OkHttpFactory.default()
     val headers = Headers.Builder()
         .add("Authorization", token)
         .build()
-    val contentType = "application/vnd.android.package-archive".toMediaType()
+    val mediaType = contentType.toMediaType()
     val apkBody = ProgressBody(
-        contentType, file, progressChange
+        mediaType, file, progressChange
     )
     val body = MultipartBody.Builder()
         .setType(MultipartBody.FORM)// 强制指定类型，默认是mixed

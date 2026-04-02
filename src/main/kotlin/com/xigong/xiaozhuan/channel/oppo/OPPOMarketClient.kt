@@ -4,6 +4,8 @@ import com.xigong.xiaozhuan.channel.VersionParams
 import com.xigong.xiaozhuan.log.AppLogger
 import com.xigong.xiaozhuan.log.action
 import com.xigong.xiaozhuan.util.ApkInfo
+import com.xigong.xiaozhuan.util.ImageSize
+import com.xigong.xiaozhuan.util.validateScreenshotFiles
 import java.io.File
 import kotlin.math.roundToInt
 
@@ -20,7 +22,8 @@ class OPPOMarketClient(
         val appInfo = getAppInfo(token, apkInfo.applicationId)
         val uploadUrl = getUploadUrl(token)
         val apkResult = uploadApk(uploadUrl, token, file, progress)
-        performSubmit(token, apkInfo, appInfo, versionParams, apkResult)
+        val screenshotUrls = uploadScreenshots(token, versionParams)
+        performSubmit(token, apkInfo, appInfo, versionParams, apkResult, screenshotUrls)
     }
 
     suspend fun getAppInfo(
@@ -60,9 +63,30 @@ class OPPOMarketClient(
         apkInfo: ApkInfo,
         appInfo: OPPOAppInfo,
         versionParams: VersionParams,
-        apkResult: OPPOApkResult
+        apkResult: OPPOApkResult,
+        screenshotUrls: List<String>
     ): Unit = AppLogger.action(LOG_TAG, "提交审核") {
-        marketApi.submit(token, apkInfo, appInfo, versionParams, apkResult)
+        marketApi.submit(token, apkInfo, appInfo, versionParams, apkResult, screenshotUrls)
+    }
+
+    private suspend fun uploadScreenshots(
+        token: String,
+        versionParams: VersionParams
+    ): List<String> {
+        val screenshots = versionParams.screenshots
+        if (screenshots.isEmpty()) return emptyList()
+        validateScreenshotFiles(
+            screenshots,
+            minCount = 3,
+            maxCount = 5,
+            maxBytes = 5L * 1024 * 1024,
+            requireSize = ImageSize(1080, 1920),
+            allowedExtensions = setOf("jpg", "jpeg", "png")
+        )
+        val uploadUrl = getUploadUrl(token)
+        return screenshots.map { file ->
+            marketApi.uploadScreenshot(uploadUrl, token, file).url
+        }
     }
 
     companion object {

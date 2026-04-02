@@ -30,6 +30,8 @@ class ApkPageState(val apkConfig: ApkConfig) {
 
     val updateDesc = mutableStateOf(apkConfig.extension.updateDesc ?: "")
 
+    val screenshotFiles = mutableStateListOf<String>()
+
 
     val channels: List<ChannelTask> = ChannelRegistry.channels.filter { apkConfig.channelEnable(it.channelName) }
 
@@ -61,6 +63,7 @@ class ApkPageState(val apkConfig: ApkConfig) {
 
     init {
         AppLogger.info(LOG_TAG, "init")
+        apkConfig.extension.screenshots?.let { screenshotFiles.addAll(it) }
         loadMarketState()
     }
 
@@ -127,7 +130,8 @@ class ApkPageState(val apkConfig: ApkConfig) {
         val apkDir = apkDirState.value ?: return
         val newExtension = apkConfig.extension.copy(
             apkDir = apkDir.absolutePath,
-            updateDesc = updateDesc
+            updateDesc = updateDesc,
+            screenshots = screenshotFiles.toList()
         )
         scope.launch {
             val configDao = ApkConfigDao()
@@ -231,6 +235,17 @@ class ApkPageState(val apkConfig: ApkConfig) {
             return null
         }
 
+        if (screenshotFiles.isNotEmpty()) {
+            if (screenshotFiles.size < 3) {
+                Toast.show("宣传图至少选择3张")
+                return null
+            }
+            if (screenshotFiles.size > 5) {
+                Toast.show("宣传图最多选择5张")
+                return null
+            }
+        }
+
         val releaseDate = if (enableScheduledRelease) {
             getReleaseTime()
         } else {
@@ -243,7 +258,8 @@ class ApkPageState(val apkConfig: ApkConfig) {
             updateDesc = updateDesc,
             channels = channels,
             apkFile = file.absolutePath,
-            onlineTime = releaseDate
+            onlineTime = releaseDate,
+            screenshots = screenshotFiles.toList()
         )
     }
 
@@ -285,6 +301,35 @@ class ApkPageState(val apkConfig: ApkConfig) {
                 Toast.show("无效的Apk文件")
             }
         }
+    }
+
+    fun selectScreenshotFiles() {
+        scope.launch {
+            val files = FileSelector.selectedFiles(getLastScreenshotDir(), "*.jpg;*.png", listOf("jpg", "jpeg", "png"))
+            if (files.isNullOrEmpty()) return@launch
+            val invalid = files.filterNot {
+                val ext = it.extension
+                ext.equals("jpg", true) || ext.equals("jpeg", true) || ext.equals("png", true)
+            }
+            if (invalid.isNotEmpty()) {
+                Toast.show("仅支持JPG/PNG宣传图")
+                return@launch
+            }
+            if (files.size > 5) {
+                Toast.show("宣传图最多选择5张")
+            }
+            screenshotFiles.clear()
+            screenshotFiles.addAll(files.take(5).map { it.absolutePath })
+        }
+    }
+
+    fun clearScreenshotFiles() {
+        screenshotFiles.clear()
+    }
+
+    private fun getLastScreenshotDir(): File? {
+        val last = screenshotFiles.firstOrNull() ?: return getLastApkDir()
+        return File(last).parentFile?.takeIf { it.exists() } ?: getLastApkDir()
     }
 
 

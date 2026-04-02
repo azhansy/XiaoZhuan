@@ -56,6 +56,10 @@ class UploadVM(
 
     private suspend fun List<TaskLauncher>.executeUpload() {
         val file = File(uploadParam.apkFile)
+        val screenshotFiles = uploadParam.screenshots
+            .map { File(it) }
+            .filter { it.exists() }
+            .take(5)
         forEach {
             it.setChannelParam(getApkConfig().channels)
             it.selectFile(file)
@@ -63,7 +67,7 @@ class UploadVM(
         }
         val updateDesc = uploadParam.updateDesc.trim()
         val onlineTime = uploadParam.onlineTime
-        val versionParams = VersionParams(updateDesc, onlineTime)
+        val versionParams = VersionParams(updateDesc, onlineTime, screenshotFiles)
         forEach { it.startSubmit(versionParams) }
     }
 

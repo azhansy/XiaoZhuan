@@ -8,5 +8,9 @@ data class VersionParams(
     /**
      * 上线时间，为0，表示立即上线,否则保存的是上线时间毫秒值
      */
-    val onlineTime: Long
+    val onlineTime: Long,
+    /**
+     * 宣传图（可选，最多5张）
+     */
+    val screenshots: List<java.io.File> = emptyList()
 )

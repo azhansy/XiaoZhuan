@@ -18,6 +18,8 @@ data class HonorUploadFile(
 
 @JsonClass(generateAdapter = true)
 data class HonorUploadUrl(
+    @Json(name = "fileName")
+    val fileName: String? = null,
     @Json(name = "uploadUrl")
     val url: String,
     @Json(name = "objectId")

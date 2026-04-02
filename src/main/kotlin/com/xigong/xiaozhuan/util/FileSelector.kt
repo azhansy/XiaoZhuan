@@ -31,6 +31,14 @@ interface FileSelector {
      */
     suspend fun selectedFile(defaultFile: File? = null, desc: String?, extensions: List<String>): File?
 
+    /**
+     * 选择多个文件
+     * @param defaultFile 默认选中的文件夹
+     * @param desc 描述
+     * @param extensions 文件名扩展名,不可为空
+     */
+    suspend fun selectedFiles(defaultFile: File? = null, desc: String?, extensions: List<String>): List<File>?
+
     companion object : FileSelector by fileSelector
 
 }
@@ -56,9 +64,23 @@ private object JFileSelector : FileSelector {
         }.awaitSelectedFile()
     }
 
+    override suspend fun selectedFiles(defaultFile: File?, desc: String?, extensions: List<String>): List<File>? {
+        require(extensions.isNotEmpty()) { "文件扩展名不能为空" }
+        return JFileChooser(defaultFile).apply {
+            fileSelectionMode = FILES_ONLY
+            isMultiSelectionEnabled = true
+            fileFilter = FileNameExtensionFilter(desc, * extensions.toTypedArray())
+        }.awaitSelectedFiles()
+    }
+
     private suspend fun JFileChooser.awaitSelectedFile(): File? = withContext(Dispatchers.IO) {
         val result = showOpenDialog(getWindow())
         selectedFile?.takeIf { result == APPROVE_OPTION }
+    }
+
+    private suspend fun JFileChooser.awaitSelectedFiles(): List<File>? = withContext(Dispatchers.IO) {
+        val result = showOpenDialog(getWindow())
+        selectedFiles?.toList()?.takeIf { result == APPROVE_OPTION && it.isNotEmpty() }
     }
 
 }
@@ -87,6 +109,15 @@ private object FileKitSelector : FileSelector {
             initialDirectory = defaultFile?.absolutePath,
             platformSettings = FileKitPlatformSettings(getWindow())
         )?.file
+    }
+
+    override suspend fun selectedFiles(defaultFile: File?, desc: String?, extensions: List<String>): List<File>? {
+        return FileKit.pickFile(
+            mode = PickerMode.Multiple,
+            type = PickerType.File(extensions),
+            initialDirectory = defaultFile?.absolutePath,
+            platformSettings = FileKitPlatformSettings(getWindow())
+        )?.mapNotNull { it.file }
     }
 
 }

@@ -5,6 +5,8 @@ import com.xigong.xiaozhuan.log.AppLogger
 import com.xigong.xiaozhuan.log.action
 import com.xigong.xiaozhuan.util.ApkInfo
 import com.xigong.xiaozhuan.util.ProgressChange
+import com.xigong.xiaozhuan.util.ImageSize
+import com.xigong.xiaozhuan.util.validateScreenshotFiles
 import kotlinx.coroutines.delay
 import java.io.File
 import java.text.SimpleDateFormat
@@ -40,6 +42,7 @@ class HuaweiConnectClient {
         uploadFile(file, uploadUrl, progressChange)
         val bindResult = bindApk(clientId, token, appId, file, uploadUrl)
         waitApkReady(clientId, token, appId, bindResult)
+        uploadScreenshots(clientId, token, appId, versionParams.screenshots)
         modifyUpdateDesc(clientId, token, appId, versionParams.updateDesc)
         submit(clientId, token, appId, versionParams.onlineTime)
 
@@ -97,6 +100,40 @@ class HuaweiConnectClient {
         val result = connectApi.getUploadUrl(clientId, token, appId, file.name, file.length())
         result.result.throwOnFail("获取Apk上传地址")
         checkNotNull(result.url)
+    }
+
+    private suspend fun uploadScreenshots(
+        clientId: String,
+        token: String,
+        appId: String,
+        screenshots: List<File>
+    ): Unit = AppLogger.action(LOG_TAG, "上传应用截图") {
+        if (screenshots.isEmpty()) return@action
+        validateScreenshotFiles(
+            screenshots,
+            minCount = 3,
+            maxCount = 5,
+            maxBytes = 5L * 1024 * 1024,
+            requireSize = ImageSize(1080, 1920),
+            allowedExtensions = setOf("jpg", "jpeg", "png")
+        )
+        val uploadUrls = screenshots.map { file ->
+            getUploadUrl(clientId, token, appId, file)
+        }
+        screenshots.zip(uploadUrls).forEach { (file, url) ->
+            uploadFile(file, url, {})
+        }
+        val files = screenshots.zip(uploadUrls).map { (file, url) ->
+            HWRefreshApk.FileInfo(file.name, url.objectId)
+        }
+        val params = HWRefreshApk(
+            lang = "zh-CN",
+            imgShowType = 0,
+            fileType = 2,
+            files = files
+        )
+        val result = connectApi.bindApkFile(clientId, token, appId, params)
+        result.result.throwOnFail("绑定截图文件")
     }
 
     /**

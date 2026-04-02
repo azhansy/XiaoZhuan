@@ -104,12 +104,48 @@ class OPPOMaretApi(
         OPPOApkResult(result.get("data").asJsonObject)
     }
 
+    suspend fun uploadScreenshot(
+        uploadUrl: OPPOUploadUrl,
+        token: String,
+        imageFile: File
+    ): OPPOApkResult = withContext(Dispatchers.IO) {
+        val params = mapOf(
+            "type" to "pic",
+            "sign" to uploadUrl.sign,
+        )
+        val requestUrl = getRequestUrl(uploadUrl.url, params, token, false)
+        val mediaType = if (imageFile.extension.equals("png", true)) {
+            "image/png".toMediaType()
+        } else {
+            "image/jpeg".toMediaType()
+        }
+        val imageBody = ProgressBody(
+            mediaType = mediaType,
+            file = imageFile,
+            progressChange = {}
+        )
+        val requestBody = MultipartBody.Builder()
+            .setType(MultipartBody.FORM)
+            .addFormDataPart("file", imageFile.name, imageBody)
+            .addFormDataPart("type", "pic")
+            .addFormDataPart("sign", uploadUrl.sign)
+            .build()
+        val request = Request.Builder()
+            .url(requestUrl)
+            .post(requestBody)
+            .build()
+        val result = okHttpClient.getJsonResult(request)
+        result.checkSuccess("上传截图")
+        OPPOApkResult(result.get("data").asJsonObject)
+    }
+
     suspend fun submit(
         token: String,
         apkInfo: ApkInfo,
         appInfo: OPPOAppInfo,
         versionParams: VersionParams,
-        apkResult: OPPOApkResult
+        apkResult: OPPOApkResult,
+        screenshotUrls: List<String>
     ) = withContext(Dispatchers.IO) {
         val apkUrl = JsonArray().apply {
             add(JsonObject().apply {
@@ -133,7 +169,7 @@ class OPPOMaretApi(
             "detail_desc" to appInfo.detailDesc,
             "privacy_source_url" to appInfo.privacyUrl,
             "icon_url" to appInfo.iconUrl,
-            "pic_url" to appInfo.picUrl,
+            "pic_url" to if (screenshotUrls.isNotEmpty()) screenshotUrls.joinToString(",") else appInfo.picUrl,
             "test_desc" to appInfo.testDesc,
             "business_username" to appInfo.businessUsername,
             "business_email" to appInfo.businessEmail,

@@ -5,6 +5,8 @@ import com.xigong.xiaozhuan.log.AppLogger
 import com.xigong.xiaozhuan.log.action
 import com.xigong.xiaozhuan.util.ApkInfo
 import com.xigong.xiaozhuan.util.FileUtil
+import com.xigong.xiaozhuan.util.ImageSize
+import com.xigong.xiaozhuan.util.validateScreenshotFiles
 import com.xigong.xiaozhuan.util.ProgressChange
 import java.io.File
 import java.text.SimpleDateFormat
@@ -35,8 +37,9 @@ class HonorConnectClient {
         val appId = getAppId(token, apkInfo.applicationId)
         val languageInfo = getAppInfo(token, appId).languageInfo.first()
         val uploadUrl = getUploadUrl(token, appId, file)
-        uploadFile(file, token, uploadUrl, progressChange)
+        uploadFile(file, token, uploadUrl, progressChange, "application/vnd.android.package-archive")
         bindUploadedApk(token, appId, uploadUrl)
+        uploadScreenshots(token, appId, languageInfo.languageId, versionParams.screenshots)
         modifyUpdateDesc(token, appId, versionParams.updateDesc, languageInfo)
         submit(token, appId, versionParams.onlineTime)
     }
@@ -114,9 +117,10 @@ class HonorConnectClient {
         file: File,
         token: String,
         url: HonorUploadUrl,
-        progressChange: ProgressChange
+        progressChange: ProgressChange,
+        contentType: String
     ): Unit = AppLogger.action(LOG_TAG, "上传Apk文件") {
-        connectApi.uploadFile(file, token, url, progressChange)
+        connectApi.uploadFile(file, token, url, progressChange, contentType)
     }
 
     /**
@@ -130,6 +134,42 @@ class HonorConnectClient {
         val fileInfo = HonorBindApkFile(listOf(HonorBindApkFile.Item(url.objectId)))
         val result = connectApi.bindApkFile(token, appId, fileInfo)
         result.throwOnFail("绑定已上传的apk文件")
+    }
+
+    private suspend fun uploadScreenshots(
+        token: String,
+        appId: String,
+        languageId: String,
+        screenshots: List<File>
+    ): Unit = AppLogger.action(LOG_TAG, "上传应用截图") {
+        if (screenshots.isEmpty()) return@action
+        validateScreenshotFiles(
+            screenshots,
+            minCount = 3,
+            maxCount = 5,
+            maxBytes = 5L * 1024 * 1024,
+            requireSize = ImageSize(1080, 1920),
+            allowedExtensions = setOf("jpg", "jpeg", "png")
+        )
+        val uploadFiles = screenshots.map { file ->
+            HonorUploadFile(file.name, 3, file.length(), FileUtil.getFileSha256(file))
+        }
+        val result = connectApi.getUploadUrl(token, appId, uploadFiles)
+        result.throwOnFail("获取截图上传地址")
+        val urls = result.data ?: emptyList()
+        val urlMap = urls.associateBy { it.fileName }
+        screenshots.forEachIndexed { index, file ->
+            val url = urlMap[file.name] ?: urls.getOrNull(index) ?: return@forEachIndexed
+            val contentType = if (file.extension.equals("png", true)) "image/png" else "image/jpeg"
+            uploadFile(file, token, url, {}, contentType)
+        }
+        val bindItems = urls.mapIndexed { index, url ->
+            HonorBindApkFile.Item(url.objectId, languageId = languageId, order = index)
+        }
+        if (bindItems.isNotEmpty()) {
+            val bindResult = connectApi.bindApkFile(token, appId, HonorBindApkFile(bindItems))
+            bindResult.throwOnFail("绑定截图文件")
+        }
     }
 
     /**

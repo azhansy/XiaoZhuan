@@ -23,6 +23,11 @@ data class UploadParam(
     val apkFile: String,
 
     /**
+     * 选中的宣传图
+     */
+    val screenshots: List<String> = emptyList(),
+
+    /**
      * 定时发布的事件,为0 表示立即发布
      */
     val onlineTime: Long

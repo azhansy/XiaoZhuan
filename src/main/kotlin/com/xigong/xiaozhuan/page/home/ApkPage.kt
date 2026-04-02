@@ -73,8 +73,60 @@ private fun ColumnScope.LeftPage(apkConfig: ApkConfig, viewModel: ApkPageState) 
 
     }
     Spacer(Modifier.height(dividerHeight))
+    ScreenshotSection(viewModel)
+    Spacer(Modifier.height(dividerHeight))
     Section("更新描述") {
         UpdateDescView(viewModel.updateDesc)
+    }
+}
+
+@Composable
+private fun ColumnScope.ScreenshotSection(viewModel: ApkPageState) {
+    Section("宣传图(可选)") {
+        Column(
+            modifier = Modifier.fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(AppColors.cardBackground)
+                .padding(16.dp)
+        ) {
+            val screenshots = viewModel.screenshotFiles
+            if (screenshots.isEmpty()) {
+                item("文件:", "未选择")
+            } else {
+                screenshots.forEachIndexed { index, path ->
+                    item("截图${index + 1}:", path)
+                    if (index != screenshots.lastIndex) {
+                        Spacer(Modifier.height(8.dp))
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "JPG/PNG, 3-5张, 1080x1920",
+                color = AppColors.fontGray,
+                fontSize = 12.sp
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Row {
+            Button(
+                colors = ButtonDefaults.outlinedButtonColors(
+                    backgroundColor = AppColors.primary,
+                ),
+                onClick = { viewModel.selectScreenshotFiles() }
+            ) {
+                Text("选择宣传图", color = Color.White, fontSize = 14.sp)
+            }
+            Spacer(Modifier.width(12.dp))
+            Button(
+                colors = ButtonDefaults.outlinedButtonColors(
+                    backgroundColor = AppColors.cardBackground,
+                ),
+                onClick = { viewModel.clearScreenshotFiles() }
+            ) {
+                Text("清空", color = AppColors.fontBlack, fontSize = 14.sp)
+            }
+        }
     }
 }
 
